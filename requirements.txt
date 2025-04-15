@@ -7,6 +7,11 @@ semantic-text-splitter
 sentence-transformers
 rank_bm25
 unstructured[pdf]
+langchain
+faiss-cpu
+huggingface-hub
+docx2txt
+
 
 
 

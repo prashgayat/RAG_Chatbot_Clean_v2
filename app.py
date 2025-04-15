@@ -1,49 +1,53 @@
-import os
-import uuid
 import streamlit as st
-from file_utils import file_loader
-from llm_answer import embed_and_store, get_reranked_qa_chain_with_fallback
-from memory_utils import reset_chat_history
+import os
+from dotenv import load_dotenv
+from file_utils import process_file
+from retriever_utils import hybrid_retriever
+from llm_answer import llm_answer
+from memory_utils import initialize_session
 
-st.set_page_config(page_title="RAG Chatbot", page_icon="😎")
-st.title("🧠 RAG Chatbot with Hybrid Search + GPT Re-ranking")
+load_dotenv()
 
-# Unique session tracking
-if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
+st.set_page_config(page_title="Robust RAG Chatbot with Hybrid Search + Re-ranking")
+st.title("📚 Robust RAG Chatbot with Hybrid Search + Re-ranking")
 
-if "stored_docs" not in st.session_state:
-    st.session_state.stored_docs = []
+# Initialize session
+initialize_session()
 
-st.markdown("**Upload a document**")
-uploaded_files = st.file_uploader("", type=["pdf", "docx", "txt"], accept_multiple_files=True)
+# File uploader
+uploaded_files = st.file_uploader(
+    "Upload documents",
+    type=["pdf", "txt", "docx", "xlsx"],
+    accept_multiple_files=True
+)
 
 if uploaded_files:
-    docs = file_loader(uploaded_files)
-    if not docs:
-        st.error("❗ No text chunks created. Please check the document format or content.")
-    else:
-        st.session_state.stored_docs.extend(docs)
-        st.success(f"✅ Loaded {len(docs)} chunks from uploaded file(s).")
+    for file in uploaded_files:
+        with st.spinner(f"Processing {file.name}..."):
+            process_file(file)
+    st.success("Documents uploaded and processed successfully!")
 
-# Memory reset button
-if st.button("Reset Memory"):
-    reset_chat_history(st.session_state.session_id)
-    st.success("💚 Memory reset for this session.")
+# Display previous chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-# Chat interface
-if st.session_state.stored_docs:
-    with st.form("question_form"):
-        query = st.text_input("Ask a question or follow-up:", key="user_input")
-        submitted = st.form_submit_button("Submit")
+# Chat input field
+user_input = st.chat_input("Ask a question about the uploaded documents...")
 
-    if submitted and query:
-        with st.spinner("📡 Retrieving documents..."):
-            response = get_reranked_qa_chain_with_fallback(
-                st.session_state.stored_docs,
-                query,
-                session_id=st.session_state.session_id
-            )
-            st.markdown("**💬 Response:**")
-            st.write(response)
+if user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response = llm_answer(user_input, session_id=st.session_state.get("session_id"))
+            st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+
+# Optional memory reset
+if st.button("🔄 Reset Conversation Memory"):
+    st.session_state.memory.clear()
+    st.session_state.messages = []
+    st.success("Memory has been reset.")

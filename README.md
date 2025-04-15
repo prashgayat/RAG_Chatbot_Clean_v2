@@ -1,91 +1,97 @@
-# 🧠 RAG Advanced Chatbot
+# 📚 Robust RAG Chatbot (Hybrid Search + Re-ranking)
 
-A modular, production-ready Retrieval-Augmented Generation (RAG) chatbot built with:
-- ✅ Hybrid search (BM25 + Semantic FAISS)
-- ✅ Semantic chunking (`semantic-text-splitter`)
-- ✅ GPT-based document re-ranking
-- ✅ Hallucination fallback protection
-- ✅ Secure API handling via `.env`
-- ✅ Clean Streamlit UI for interaction
+A production-ready, hallucination-resistant Retrieval-Augmented Generation (RAG) chatbot built using:
+
+- ✅ Hybrid search (Semantic + Keyword)
+- ✅ Semantic + keyword + token-aware chunking
+- ✅ Re-ranking using OpenAI
+- ✅ Conversational memory with Streamlit chat UI
+- ✅ Secure key management via `.env`
+- ✅ Designed for GitHub Codespaces and local dev
 
 ---
 
 ## 🚀 Features
 
-- **Document Upload**: Supports PDF, DOCX, and TXT files.
-- **Hybrid Search**: Combines keyword search (BM25) with semantic vector search (FAISS).
-- **Re-ranking with GPT**: Uses OpenAI LLM to sort the most relevant chunks.
-- **Fallback Logic**: Prevents hallucination by checking LLM’s confidence level.
-- **Token-Aware Chunking**: Built with `semantic-text-splitter` for meaningful input context.
-- **Secure Key Handling**: Keys are stored via `.env` and ignored from Git.
+- 🔍 Hybrid Retrieval: FAISS + BM25
+- ✂️ HybridTextSplitter: domain-specific keyword splitting + `semantic-text-splitter`
+- 💬 Multi-turn chat with memory (Streamlit chat interface)
+- 🔁 Re-ranking with OpenAI (optional)
+- 🔐 .env-based secret management (no `secrets.toml` required)
+- ✅ Strict hallucination fallback (“I couldn't find the answer in the documents”)
 
 ---
 
-## 🛠 Setup Instructions
+## 📦 Installation
 
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/your-username/RAG_Advanced_Chatbot.git
-cd RAG_Advanced_Chatbot
-```
-
-### 2. Install requirements
+Create your virtual environment and install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Add your OpenAI key to `.env`
+---
 
-Create a `.env` file in the root:
+## 🔐 Setup API Keys
 
+Create a `.env` file in your project root:
+
+```env
+OPENAI_API_KEY=sk-...
 ```
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
 
-### 4. Run the chatbot
+Add `.env` and `.streamlit/secrets.toml` to `.gitignore` to avoid leaking secrets.
+
+---
+
+## 🧠 How It Works
+
+1. Upload documents (PDF, TXT, DOCX, XLSX)
+2. Documents are split using `HybridTextSplitter`:
+   - First split by domain keywords
+   - Then semantically chunked using `semantic-text-splitter`
+3. Chunks are added to a FAISS vectorstore
+4. On user query:
+   - Retrieve top-k results using FAISS + BM25
+   - Optionally re-rank using OpenAI ChatCompletion
+   - LLM responds using context with fallback logic
+
+---
+
+## 💻 Usage
 
 ```bash
 streamlit run app.py
 ```
 
-Visit `localhost:8501` or the URL shown in your terminal.
+Then visit the local URL (e.g., http://localhost:8501)
 
 ---
 
-## 📦 File Structure
+## 🧪 Test Prompts
 
-```
-├── app.py                 # Streamlit app UI
-├── file_utils.py          # Loads and splits documents semantically
-├── llm_answer.py          # Hybrid search, reranking, and fallback logic
-├── requirements.txt       # All Python dependencies
-├── .env                   # API keys (not committed)
-└── README.md              # This file
-```
+Try multi-turn interactions like:
+
+- “What is the importance of a personal mission statement?”
+- Follow-up: “How can someone begin writing one?”
 
 ---
 
-## ✅ Example Use Cases
+## ✅ To-Do (Optional Enhancements)
 
-- Customer Support Chatbots
-- Legal / Medical document QA
-- Domain-specific RAG assistants
-- Enterprise search with minimal hallucination risk
-
----
-
-## 🧪 Roadmap Ideas
-
-- [ ] UI to inspect chunks and scores
-- [ ] LangChain memory for multi-turn chats
-- [ ] Support for multiple document indexing
-- [ ] LLM-driven feedback loop (RLHF-style tuning)
+- [ ] Save/load FAISS to disk
+- [ ] Add role-based prompt templates
+- [ ] Support document versioning
+- [ ] Add UI for re-ranking toggle
 
 ---
 
-## 📜 License
+## ⚠️ Security Notes
 
-MIT — feel free to use, fork, and build on it!
+- Do **not** check in `.env` or `secrets.toml`
+- Keys should only be loaded via `os.getenv("OPENAI_API_KEY")`
+
+---
+
+Built with ❤️ and late nights.
 
