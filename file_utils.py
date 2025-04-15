@@ -9,8 +9,9 @@ from langchain_community.document_loaders import (
     TextLoader,
     Docx2txtLoader
 )
+
 from langchain_core.documents import Document
-from text_split.splitter import SimpleTextSplitter as TextSplitter  # ✅ Use your custom splitter
+from Hybrid_splitter import HybridTextSplitter as TextSplitter  # ✅ Semantic + rule-based splitting
 
 
 def save_uploaded_file(uploaded_file):
@@ -20,7 +21,6 @@ def save_uploaded_file(uploaded_file):
         with open(save_path, "wb") as f:
             f.write(uploaded_file.read())
     else:
-        # Already a string/path (fallback)
         save_path = str(uploaded_file)
     return save_path
 
@@ -50,8 +50,8 @@ def file_loader(uploaded_files, chunk_size=300, chunk_overlap=50):
 
             splitter = TextSplitter(chunk_size=chunk_size, overlap=chunk_overlap)
             chunks = splitter.split_documents(docs)
-            all_chunks.extend(chunks)
 
+            all_chunks.extend(chunks)
         except Exception as e:
             st.error(f"🔥 Error processing file: {e}")
 
