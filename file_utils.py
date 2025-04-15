@@ -1,50 +1,52 @@
 import os
+import tempfile
+from pathlib import Path
 import streamlit as st
+from langchain_community.document_loaders import (
+    UnstructuredFileLoader,
+    PyPDFLoader,
+    TextLoader,
+    Docx2txtLoader,
+)
+from langchain_core.documents import Document
 from semantic_text_splitter import TextSplitter
-from langchain.docstore.document import Document
-from langchain.document_loaders import UnstructuredFileLoader
 
-def file_loader(uploaded_file):
-    try:
-        # ✅ Ensure upload directory exists
-        upload_dir = "uploaded_docs"
-        os.makedirs(upload_dir, exist_ok=True)
 
-        # ✅ Save the uploaded file to disk
-        file_path = os.path.join(upload_dir, uploaded_file.name)
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+def save_uploaded_file(uploaded_file):
+    temp_dir = tempfile.mkdtemp()
+    save_path = os.path.join(temp_dir, uploaded_file.name)
+    with open(save_path, "wb") as f:
+        f.write(uploaded_file.read())
+    return save_path
 
-        # ✅ Load file content using UnstructuredFileLoader
-        loader = UnstructuredFileLoader(file_path)
-        raw_docs = loader.load()
 
-        if not raw_docs:
-            st.error("⚠️ Document could not be parsed. Try uploading a different file.")
-            return []
+def load_file(path):
+    ext = Path(path).suffix.lower()
+    if ext == ".pdf":
+        return PyPDFLoader(path)
+    elif ext == ".txt":
+        return TextLoader(path, encoding="utf-8")
+    elif ext == ".docx":
+        return Docx2txtLoader(path)
+    else:
+        return UnstructuredFileLoader(path)
 
-        return split_documents(raw_docs)
 
-    except Exception as e:
-        st.error(f"🔥 Error: {str(e)}")
-        return []
-
-def split_documents(documents):
-    # ✅ Initialize the semantic splitter with sentence-transformers model
-    splitter = TextSplitter(model="sentence-transformers/all-MiniLM-L6-v2")
-
+def file_loader(uploaded_files, chunk_size=300):
     all_chunks = []
-    for doc in documents:
-        chunks = splitter.chunks(
-            doc.page_content,
-            chunk_size=300,
-            chunk_overlap=50
-        )
-        for chunk in chunks:
-            all_chunks.append(Document(page_content=chunk))
+    if not isinstance(uploaded_files, list):
+        uploaded_files = [uploaded_files]
 
-    if not all_chunks:
-        st.error("❌ No chunks were generated. Please try a simpler document or different format.")
+    for uploaded_file in uploaded_files:
+        try:
+            file_path = save_uploaded_file(uploaded_file)
+            st.success(f"{Path(file_path).name} uploaded successfully")
+            loader = load_file(file_path)
+            docs = loader.load()
 
+            splitter = TextSplitter(chunk_size)
+            chunks = splitter.split_documents(docs)
+            all_chunks.extend(chunks)
+        except Exception as e:
+            st.error(f"🔥 Error processing file: {e}")
     return all_chunks
-
