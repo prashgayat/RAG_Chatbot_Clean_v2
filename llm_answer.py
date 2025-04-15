@@ -1,24 +1,21 @@
-#LLM answer
+# llm_answer.py
 
+from dotenv import load_dotenv
+load_dotenv()
 import os
 import openai
-from dotenv import load_dotenv
 
 from langchain.vectorstores import FAISS
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from langchain.retrievers import BM25Retriever
 from langchain.retrievers.ensemble import EnsembleRetriever
-from langchain.docstore.document import Document
 
-load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# 🔹 Step 1: Return docs as-is for use in hybrid retrievers
 def embed_and_store(docs):
     return docs
 
-# 🔹 Step 2: Build the hybrid retriever (BM25 + FAISS)
 def get_hybrid_retriever(docs):
     bm25 = BM25Retriever.from_documents(docs)
     bm25.k = 5
@@ -26,11 +23,10 @@ def get_hybrid_retriever(docs):
     embeddings = OpenAIEmbeddings()
     vectorstore = FAISS.from_documents(docs, embeddings)
     faiss_retriever = vectorstore.as_retriever(search_type="mmr")
-    faiss_retriever.k = 5
+    faiss_retriever.search_kwargs["k"] = 5
 
     return EnsembleRetriever(retrievers=[bm25, faiss_retriever], weights=[0.5, 0.5])
 
-# 🔹 Step 3: Use OpenAI GPT to rerank top-k retrieved chunks
 def rerank_documents_with_gpt(query, documents, top_k=3):
     prompt = f"""You are a helpful assistant tasked with re-ranking chunks of a document based on how well they answer the following question:
 
@@ -59,11 +55,14 @@ Chunks:
 
     return selected_chunks
 
-# 🔹 Step 4: Build a fallback-aware QA chain using reranked chunks
 def get_reranked_qa_chain_with_fallback(docs, query):
     retriever = get_hybrid_retriever(docs)
     initial_docs = retriever.get_relevant_documents(query)
+
     reranked_docs = rerank_documents_with_gpt(query, initial_docs)
+
+    if not reranked_docs:
+        return "⚠️ No relevant context found for this query."
 
     llm = ChatOpenAI(temperature=0.2)
 
