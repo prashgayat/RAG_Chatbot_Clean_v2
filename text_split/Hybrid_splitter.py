@@ -1,37 +1,50 @@
-# Hybrid_splitter.py
-
-from semantic_text_splitter import TextSplitter as SemanticTextSplitter
-from typing import List
 import re
-from langchain_core.documents import Document
-
+from typing import List
+from langchain.schema import Document
+from semantic_text_splitter import TextSplitter
 
 class HybridTextSplitter:
-    def __init__(self, chunk_size: int = 300, overlap: int = 50, keywords: List[str] = None):
-        self.semantic_splitter = SemanticTextSplitter(
-            capacity=chunk_size,
-            overlap=overlap
+    def __init__(self, keywords=None, chunk_size=300, chunk_overlap=50):
+        self.keywords = keywords or [
+            "agreement", "obligation", "terms", "party", "confidential", "contract",
+            "purpose", "responsibility", "definition", "scope", "termination", "right", "project"
+        ]
+        # ✅ Correct semantic splitter initialization
+        self.semantic_splitter = TextSplitter.from_tiktoken_encoder(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            separators=["\n\n", "\n", ".", " ", ""]
         )
-        self.keywords = keywords or ["Habit", "Principle", "Mission", "Character", "Effectiveness"]
 
     def _keyword_split(self, text: str) -> List[str]:
-        # Create a regex pattern to split before the keywords (case-insensitive)
-        pattern = r"|".join([fr"(?i)(?=\b{re.escape(kw)}\b)" for kw in self.keywords])
-        parts = re.split(pattern, text)
-        return [part.strip() for part in parts if part.strip()]
+        try:
+            pattern = r"|".join([rf"\b{k}\b" for k in self.keywords])
+            splits = re.split(pattern, text, flags=re.IGNORECASE)
+            print(f"🔑 Keyword-based splits: {len(splits)}")
+            return [s.strip() for s in splits if s.strip()]
+        except Exception as e:
+            print(f"❗ Keyword split failed: {e}")
+            return [text]
 
-    def split_documents(self, documents: List[Document]) -> List[dict]:
+    def split_documents(self, documents: List[Document]) -> List[Document]:
         all_chunks = []
+
         for doc in documents:
-            text = doc.page_content
+            text = doc.page_content.strip()
+            if not text:
+                continue
 
-            # Step 1: Keyword-based split (domain-specific)
-            keyword_chunks = self._keyword_split(text)
+            try:
+                keyword_chunks = self._keyword_split(text)
+                semantic_chunks = self.semantic_splitter.create_documents(keyword_chunks)
 
-            # Step 2: Semantic split on keyword chunks
-            for chunk in keyword_chunks:
-                semantic_chunks = self.semantic_splitter.split_text(chunk)
-                for sub_chunk in semantic_chunks:
-                    all_chunks.append({"page_content": sub_chunk})
+                print(f"🧠 Semantic chunks created: {len(semantic_chunks)}")
+                for i, chunk in enumerate(semantic_chunks[:3]):
+                    print(f"Chunk {i+1} Preview:\n{chunk.page_content[:300]}...\n")
 
+                all_chunks.extend(semantic_chunks)
+            except Exception as e:
+                print(f"❗ Error while splitting document: {e}")
+
+        print(f"📦 Total Chunks Returned: {len(all_chunks)}")
         return all_chunks

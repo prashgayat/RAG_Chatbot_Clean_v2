@@ -1,53 +1,57 @@
 import streamlit as st
-import os
-from dotenv import load_dotenv
+import uuid
 from file_utils import process_file
+from text_split.Hybrid_splitter import HybridTextSplitter
 from retriever_utils import hybrid_retriever
 from llm_answer import llm_answer
-from memory_utils import initialize_session
+from memory_utils import get_memory
 
-load_dotenv()
-
-st.set_page_config(page_title="Robust RAG Chatbot with Hybrid Search + Re-ranking")
+# ---- Streamlit UI Setup ----
+st.set_page_config(page_title="📚 Robust RAG Chatbot with Hybrid Search + Re-ranking")
 st.title("📚 Robust RAG Chatbot with Hybrid Search + Re-ranking")
 
-# Initialize session
-initialize_session()
+uploaded_file = st.file_uploader("Upload documents", type=["pdf", "txt", "docx", "xlsx"])
 
-# File uploader
-uploaded_files = st.file_uploader(
-    "Upload documents",
-    type=["pdf", "txt", "docx", "xlsx"],
-    accept_multiple_files=True
-)
+if uploaded_file:
+    file_path = uploaded_file.name
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
 
-if uploaded_files:
-    for file in uploaded_files:
-        with st.spinner(f"Processing {file.name}..."):
-            process_file(file)
-    st.success("Documents uploaded and processed successfully!")
+    st.info(f"📄 Saved uploaded file to: {file_path}")
 
-# Display previous chat history
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    # Step 1: Load + Parse
+    documents = process_file(file_path)
 
-# Chat input field
-user_input = st.chat_input("Ask a question about the uploaded documents...")
+    # Step 2: Hybrid Chunking
+    splitter = HybridTextSplitter()
+    chunks = splitter.split_documents(documents)
 
-if user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
+    if not chunks:
+        st.error("❗ No text chunks created. Please check the document format or content.")
+    else:
+        st.success(f"✅ Document '{file_path}' uploaded and processed successfully!")
 
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = llm_answer(user_input, session_id=st.session_state.get("session_id"))
-            st.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
+        # Step 3: Session Memory Setup
+        session_id = st.session_state.get("session_id", str(uuid.uuid4()))
+        st.session_state["session_id"] = session_id
+        memory = get_memory(session_id)
 
-# Optional memory reset
-if st.button("🔄 Reset Conversation Memory"):
-    st.session_state.memory.clear()
-    st.session_state.messages = []
-    st.success("Memory has been reset.")
+        # Step 4: Ask Questions
+        user_question = st.text_input("Ask a question about the document:")
+
+        if user_question:
+            # ⚠️ Replace these with actual stores if not wired
+            vectorstore = None
+            keyword_index = None
+
+            # Step 5: Hybrid Retrieve + Answer
+            docs = hybrid_retriever(user_question, vectorstore, keyword_index)
+            answer = llm_answer(user_question, docs, memory)
+
+            st.markdown("### 🤖 Answer")
+            st.write(answer)
+
+# Optional: Memory Reset
+if st.button("🔄 Reset Memory"):
+    st.session_state["session_id"] = str(uuid.uuid4())
+    st.success("🧠 Conversation memory reset.")
