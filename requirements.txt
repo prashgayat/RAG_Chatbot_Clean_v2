@@ -19,3 +19,4 @@ docx2txt
 
 
 PyPDF2>=3.0.0
+semantic-text-splitter>=0.5.0
